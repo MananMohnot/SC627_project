@@ -12,6 +12,10 @@ from CurvesGenerator import cubic_spline, quintic_polynomial, quartic_polynomial
 import LatticePlanner.env as env
 import LatticePlanner.draw as draw
 
+position_x = []
+position_y=[]
+jerk=[] 
+acc = []
 
 class C:
     # Parameter
@@ -19,7 +23,7 @@ class C:
     MAX_ACCEL = 8.0
     MAX_CURVATURE = 2.5
 
-    ROAD_WIDTH = 20
+    ROAD_WIDTH = 8
     ROAD_SAMPLE_STEP = 1.0
 
     T_STEP = 0.15
@@ -47,9 +51,9 @@ class C:
     K_SIZE = 0.9
     RF = 4.5 * K_SIZE  # [m] distance from rear to vehicle front end of vehicle
     RB = 1.0 * K_SIZE  # [m] distance from rear to vehicle back end of vehicle
-    W = 3.0 * K_SIZE  # [m] width of vehicle
+    W = 2  # [m] width of vehicle
     WD = 0.7 * W  # [m] distance between left-right wheels
-    WB = 3.5 * K_SIZE  # [m] Wheel base
+    WB = 2 * K_SIZE  # [m] Wheel base
     TR = 0.5 * K_SIZE  # [m] Tyre radius
     TW = 1 * K_SIZE  # [m] Tyre width
     MAX_STEER = 0.6  # [rad] maximum steering angle
@@ -116,6 +120,7 @@ def sampling_paths_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
                             C.K_COLLISION * is_path_collision(path)
 
                 PATHS[path] = path.cost
+        
 
     return PATHS
 
@@ -265,14 +270,6 @@ def lattice_planner_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
 
     return path
 
-
-def lattice_planner_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
-    paths = sampling_paths_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path)
-    path = extract_optimal_path(paths)
-
-    return path
-
-
 def get_reference_line(x, y):
     index = range(0, len(x), 3)
     x = [x[i] for i in index]
@@ -308,14 +305,14 @@ def main_Crusing():
     bx1, by1 = ENV.bound_in
     bx2, by2 = ENV.bound_out
 
-    C.obs = np.array([[50, 27],[20,32]])  ########################## for adding and removing obstacles
+    C.obs = np.array([[25, 29]])  ########################## for adding and removing obstacles
 
     obs_x = [x for x, y in C.obs]
     obs_y = [y for x, y in C.obs]
 
     rx, ry, ryaw, rk, ref_path = get_reference_line(wx, wy)
 
-    l0 = 2.0  # current lateral position [m]
+    l0 = 0.0  # current lateral position [m]
     l0_v = 0.0  # current lateral speed [m/s]
     l0_a = 0.0  # current lateral acceleration [m/s]
     s0 = 0.0  # current course position
@@ -354,6 +351,10 @@ def main_Crusing():
         plt.plot(path.x[1:], path.y[1:], linewidth='2', color='royalblue')
         plt.plot(obs_x, obs_y, 'ok')
         draw.draw_car(path.x[1], path.y[1], path.yaw[1], steer, C)
+        position_x.append(path.x[1])
+        position_y.append(path.y[1])
+        jerk.append(path.l_jerk[0])
+        acc.append(path.l_a[0])
         plt.title("[Crusing Mode]  v :" + str(s0_v * 3.6)[0:4] + " km/h")
         plt.axis("equal")
         plt.pause(0.0001)
@@ -361,69 +362,17 @@ def main_Crusing():
     plt.pause(0.0001)
     plt.show()
 
-    plt.plot(np.linspace(0,70,30),path.l_jerk,linestyle='--')
+    plt.plot(np.linspace(0,70,61),jerk,linestyle='--')
+    plt.title("Jerk")
+    plt.show()
+    plt.plot(position_x,position_y,linestyle='--')
+    plt.title("Position")
+    plt.show()
+    plt.plot(np.linspace(0,70,61),acc,linestyle='--')
+    plt.title("Acceleration")
     plt.show()
 
 
-def main_Stopping():
-    ENV = env.ENVStopping()
-    wx, wy = ENV.ref_line
-    bx1, by1 = ENV.bound_up
-    bx2, by2 = ENV.bound_down
-
-    C.ROAD_WIDTH = ENV.road_width
-    rx, ry, ryaw, rk, ref_path = get_reference_line(wx, wy)
-
-    l0 = 0.0  # current lateral position [m]
-    l0_v = 0.0  # current lateral speed [m/s]
-    l0_a = 0.0  # current lateral acceleration [m/s]
-    s0 = 0.0  # current course position
-    s0_v = 30.0 / 3.6  # current speed [m/s]
-    s0_a = 0.0
-
-    while True:
-        path = lattice_planner_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path)
-
-        if path is None:
-            print("No feasible path found!!")
-            break
-
-        l0 = path.l[1]
-        l0_v = path.l_v[1]
-        l0_a = path.l_a[1]
-        s0 = path.s[1]
-        s0_v = path.s_v[1]
-        s0_a = path.s_a[1]
-
-        if np.hypot(path.x[1] - 56.0, path.y[1] - 0) <= 1.5:
-            print("Goal")
-            break
-
-        plt.cla()
-        # for stopping simulation with the esc key.
-        plt.gcf().canvas.mpl_connect(
-            'key_release_event',
-            lambda event: [exit(0) if event.key == 'escape' else None])
-        plt.plot(rx, ry, linestyle='--', color='gray')
-        plt.plot(bx1, by1, linewidth=1.5, color='k')
-        plt.plot(bx2, by2, linewidth=1.5, color='k')
-        plt.plot(path.x[1:], path.y[1:], linewidth='2', color='royalblue')
-        draw.draw_car(path.x[1], path.y[1], path.yaw[1], 0.0, C)
-        plt.title("[Stopping Mode]  v :" + str(s0_v * 3.6)[0:4] + " km/h")
-        plt.axis("equal")
-        plt.pause(0.0001)
-
-    plt.pause(0.0001)
-    plt.show()
-
-    plt.plot(rx, ry, linestyle='--', color='gray')
-    plt.plot(bx1, by1, linewidth=1.5, color='k')
-    plt.plot(bx2, by2, linewidth=1.5, color='k')
-    plt.axis("equal")
-    plt.show()
-
-    plt.plot(rx,path.l_jerk,linstyle='..')
-    plt.show()
 
 if __name__ == '__main__':
     main_Crusing()

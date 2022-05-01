@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 class ENVCrusing:
     def __init__(self):
         self.max_c = 0.15
-        self.road_width = 20
+        self.road_width = 8
         self.ref_line = self.design_reference_line()
         self.bound_in = self.design_boundary_in()
         self.bound_out = self.design_boundary_out()
